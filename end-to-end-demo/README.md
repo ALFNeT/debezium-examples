@@ -7,26 +7,37 @@ It does these things:
 * setting up JDBC sink connector to stream the events to Postgres
 * demonstrating how a downtime of Kafka Connect doesn't affect the source app
 * demonstrating how to consume events using WildFly Swarm + CDI and stream them to a WebSockets client in another browser window
+* demonstrating how a single connect instance can support Avro and Json serialization for multiple connector configurations
 
 ---
 
-**IMPORTANT:** Use Maven 3.5.x to build and execute demo applications.
+**IMPORTANT:** Use Maven 3.5.x and latest version of docker to build and execute demo applications.
 
 ---
+
+## Setup Environment
+
+- export DEBEZIUM_VERSION=0.10
+
+## Build maven artifacts used by the Docker builds
+
+- mvn clean package -f debezium-hiking-demo/pom.xml
+- mvn clean package -f debezium-swarm-demo/pom.xml
 
 ## Prepare Kafka etc.
 
-- export DEBEZIUM_VERSION=0.9
 - docker ps -a
 - docker-compose up --scale swarm=0 --scale hiking-manager=0
 
 ## Prepare WildFly
 
-- mvn clean package -f debezium-hiking-demo/pom.xml
 - docker-compose up --build -d hiking-manager
 - Go to http://localhost:8080/hikr-1.0-SNAPSHOT/hikes.html
 
 ## Register source connector (Avro)
+
+- Note: The connect instance is configured to use JSON serialization by default.
+The configuration used for the hiking-connector and its accompanying jdbc-sink are explicitly configured to use AVRO.
 
 - cat register-hiking-connector.json | http POST http://localhost:8083/connectors/
 - http localhost:8083/connectors/hiking-connector/status
@@ -50,12 +61,11 @@ It does these things:
 
 ## Register source connector (JSON)
 
-- cat register-hiking-connector-json.json | http POST http://localhost:8084/connectors/
+- cat register-hiking-connector-json.json | http POST http://localhost:8083/connectors/
 - docker-compose exec kafka /kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 --from-beginning --property print.key=true --topic dbserver1_inventory_Hike_json
 
 ## Start WildFly Swarm app
 
-- mvn clean package -f debezium-swarm-demo/pom.xml
 - docker-compose up -d --build
 - Open in other browser: http://localhost:8079/
 

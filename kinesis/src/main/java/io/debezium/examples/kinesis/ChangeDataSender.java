@@ -43,6 +43,8 @@ public class ChangeDataSender implements Runnable {
     private final Configuration config;
     private final JsonConverter valueConverter;
     private final AmazonKinesisFirehose kinesisFirehoseClient;
+    private final AmazonKinesis kinesisClient;
+    private EmbeddedEngine engine;
 
     public ChangeDataSender() {
         config = Configuration.empty().withSystemProperties(Function.identity()).edit()
@@ -75,7 +77,7 @@ public class ChangeDataSender implements Runnable {
 
     @Override
     public void run() {
-        final EmbeddedEngine engine = EmbeddedEngine.create()
+        engine = EmbeddedEngine.create()
                 .using(config)
                 .using(this.getClass().getClassLoader())
                 .using(Clock.SYSTEM)
@@ -90,18 +92,29 @@ public class ChangeDataSender implements Runnable {
             engine.stop();
         }));
 
+        // the submitted task keeps running, only no more new ones can be added
+        executor.shutdown();
+
         awaitTermination(executor);
+
+        cleanUp();
+
+        LOGGER.info("Engine terminated");
     }
 
     private void awaitTermination(ExecutorService executor) {
         try {
             while (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-                LOGGER.info("Waiting another 10 seconds for the embedded engine to shut down");
+                LOGGER.info("Waiting another 10 seconds for the embedded engine to complete");
             }
         }
         catch (InterruptedException e) {
-            Thread.interrupted();
+            Thread.currentThread().interrupt();
         }
+    }
+
+    private void cleanUp() {
+        kinesisClient.shutdown();
     }
 
     private void sendRecord(SourceRecord record) {
@@ -123,7 +136,8 @@ public class ChangeDataSender implements Runnable {
                     .field("key", record.keySchema())
                     .field("value", record.valueSchema())
                     .build();
-        }else{
+        }
+        else {
             schema = SchemaBuilder.struct()
                     .field("key", record.keySchema())
                     .build();

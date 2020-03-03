@@ -28,16 +28,21 @@ class EventSource {
     private boolean running = true;
     private Thread thread;
     private final Random random = new Random();
+    private final String databaseServer;
+
+    public EventSource(String databaseServer) {
+        this.databaseServer = databaseServer;
+    }
 
     public void run() {
         thread = new Thread(() -> {
-            EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("templatePU");
+            EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(databaseServer);
             EntityManager entityManager = entityManagerFactory.createEntityManager();
 
             entityManager.getTransaction().begin();
             List<Category> categories = entityManager.createQuery("from Category c", Category.class).getResultList();
-            Object[] minMaxCustomerIds = (Object[]) entityManager.createNativeQuery("select min(id), max(id) from customers").getSingleResult();
-            Object[] minMaxProductIds = (Object[]) entityManager.createNativeQuery("select min(id), max(id) from products").getSingleResult();
+            Object[] minMaxCustomerIds = entityManager.createQuery("select min(id), max(id) from Customer c", Object[].class).getSingleResult();
+            Object[] minMaxProductIds = entityManager.createQuery("select min(id), max(id) from Product p", Object[].class).getSingleResult();
 
             entityManager.getTransaction().commit();
 
@@ -47,7 +52,9 @@ class EventSource {
                     entityManager.getTransaction().begin();
                 }
 
-                entityManager.persist(getRandomOrder(entityManager, (int)minMaxCustomerIds[0], (int)minMaxCustomerIds[1], (int)minMaxProductIds[0], (int)minMaxProductIds[1], categories));
+		entityManager.persist(getRandomOrder(entityManager, ((Long)minMaxCustomerIds[0]).intValue(),
+                    ((Long)minMaxCustomerIds[1]).intValue(), ((Long)minMaxProductIds[0]).intValue(),
+                    ((Long)minMaxProductIds[1]).intValue(), categories));
 
                 i++;
                 try {

@@ -19,6 +19,8 @@
 
         <kinesis.region>ap-southeast-2</kinesis.region>
 
+        <mysql.init.timeout>30000</mysql.init.timeout>
+
         <version.debezium>0.9.5.Final</version.debezium>
         <version.debezium.tag>0.9</version.debezium.tag>
         <version.kinesis.client>1.9.0</version.kinesis.client>

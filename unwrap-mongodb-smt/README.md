@@ -1,7 +1,7 @@
 # Debezium Unwrap MongoDB SMT Demo
 
 This example shows how to capture events from a MongoDB database and stream them to a relational database (Postgres in this case).
-In order to convert the CDC events ebitted by Debezium's MongoDB connector into a "flat" structure consumable by the JDBC sink connector, [Debezium MongoDB Event Flattening SMT](http://debezium.io/docs/configuration/mongodb-event-flattening/) is used.
+In order to convert the CDC events ebitted by Debezium's MongoDB connector into a "flat" structure consumable by the JDBC sink connector, [Debezium MongoDB Event Flattening SMT](https://debezium.io/docs/configuration/mongodb-event-flattening/) is used.
 
 We are using Docker Compose to deploy the following components:
 
@@ -9,14 +9,14 @@ We are using Docker Compose to deploy the following components:
 * Kafka
   * ZooKeeper
   * Kafka Broker
-  * Kafka Connect with the [Debezium CDC](http://debezium.io/) and [JDBC sink](https://github.com/confluentinc/kafka-connect-jdbc) connectors as well as the Postgres JDBC driver
+  * Kafka Connect with the [Debezium CDC](https://debezium.io/) and [JDBC sink](https://github.com/confluentinc/kafka-connect-jdbc) connectors as well as the Postgres JDBC driver
 * PostgreSQL
 
 ## Preparations
 
 ```shell
 # Start the application
-export DEBEZIUM_VERSION=0.8
+export DEBEZIUM_VERSION=0.10
 docker-compose up --build -d
 
 # Initialize MongoDB replica set and insert some test data
@@ -125,6 +125,31 @@ docker-compose exec postgres bash -c 'psql -U $POSTGRES_USER $POSTGRES_DB -c "se
  Hopper    | 1005 | Billy-Bob  | bob@example.com
 (5 rows)
 ```
+
+```shell
+docker-compose exec mongodb bash -c 'mongo -u $MONGODB_USER -p $MONGODB_PASSWORD --authenticationDatabase admin inventory'
+
+MongoDB server version: 3.4.10
+rs0:PRIMARY>
+db.customers.remove(
+   {
+    _id: NumberLong("1005")
+   }
+);   
+```
+
+Verify that record in PostgreSQL is deleted:
+
+```shell
+docker-compose exec postgres bash -c 'psql -U $POSTGRES_USER $POSTGRES_DB -c "select * from customers"'
+
+ last_name |  id  | first_name |         email
+-----------+------+------------+-----------------------
+...
+(4 rows)
+```
+
+There should be no record of `Billy Bob Hopper`.
 
 End application:
 

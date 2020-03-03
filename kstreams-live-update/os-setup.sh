@@ -54,25 +54,25 @@ oc process strimzi-connect-s2i \
     -p KAFKA_CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE=true \
     | oc apply -f -
 
-export DEBEZIUM_VERSION=0.8.3.Final
+export DEBEZIUM_VERSION=0.10.0.Final
 mkdir -p plugins && cd plugins && \
-curl http://central.maven.org/maven2/io/debezium/debezium-connector-mysql/$DEBEZIUM_VERSION/debezium-connector-mysql-$DEBEZIUM_VERSION-plugin.tar.gz | tar xz; \
+curl https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/$DEBEZIUM_VERSION/debezium-connector-mysql-$DEBEZIUM_VERSION-plugin.tar.gz | tar xz; \
 mkdir confluent-jdbc-sink && cd confluent-jdbc-sink && \
-curl -O http://central.maven.org/maven2/org/postgresql/postgresql/42.2.2/postgresql-42.2.2.jar && \
-curl -O http://packages.confluent.io/maven/io/confluent/kafka-connect-jdbc/5.0.0/kafka-connect-jdbc-5.0.0.jar && \
+curl -O https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.2/postgresql-42.2.2.jar && \
+curl -O https://packages.confluent.io/maven/io/confluent/kafka-connect-jdbc/5.0.0/kafka-connect-jdbc-5.0.0.jar && \
 cd .. && \
 mkdir confluent-es-sink && cd confluent-es-sink && \
-curl -sO http://packages.confluent.io/maven/io/confluent/kafka-connect-elasticsearch/5.0.0/kafka-connect-elasticsearch-5.0.0.jar && \
-curl -sO http://central.maven.org/maven2/io/searchbox/jest/2.0.0/jest-2.0.0.jar && \
-curl -sO http://central.maven.org/maven2/org/apache/httpcomponents/httpcore-nio/4.4.4/httpcore-nio-4.4.4.jar && \
-curl -sO http://central.maven.org/maven2/org/apache/httpcomponents/httpclient/4.5.1/httpclient-4.5.1.jar && \
-curl -sO http://central.maven.org/maven2/org/apache/httpcomponents/httpasyncclient/4.1.1/httpasyncclient-4.1.1.jar && \
-curl -sO http://central.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.4/httpcore-4.4.4.jar && \
-curl -sO http://central.maven.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar && \
-curl -sO http://central.maven.org/maven2/commons-codec/commons-codec/1.9/commons-codec-1.9.jar && \
-curl -sO http://central.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.4/httpcore-4.4.4.jar && \
-curl -sO http://central.maven.org/maven2/io/searchbox/jest-common/2.0.0/jest-common-2.0.0.jar && \
-curl -sO http://central.maven.org/maven2/com/google/code/gson/gson/2.4/gson-2.4.jar && \
+curl -sO https://packages.confluent.io/maven/io/confluent/kafka-connect-elasticsearch/5.0.0/kafka-connect-elasticsearch-5.0.0.jar && \
+curl -sO https://repo1.maven.org/maven2/io/searchbox/jest/2.0.0/jest-2.0.0.jar && \
+curl -sO https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore-nio/4.4.4/httpcore-nio-4.4.4.jar && \
+curl -sO https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient/4.5.1/httpclient-4.5.1.jar && \
+curl -sO https://repo1.maven.org/maven2/org/apache/httpcomponents/httpasyncclient/4.1.1/httpasyncclient-4.1.1.jar && \
+curl -sO https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.4/httpcore-4.4.4.jar && \
+curl -sO https://repo1.maven.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar && \
+curl -sO https://repo1.maven.org/maven2/commons-codec/commons-codec/1.9/commons-codec-1.9.jar && \
+curl -sO https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.4/httpcore-4.4.4.jar && \
+curl -sO https://repo1.maven.org/maven2/io/searchbox/jest-common/2.0.0/jest-common-2.0.0.jar && \
+curl -sO https://repo1.maven.org/maven2/com/google/code/gson/gson/2.4/gson-2.4.jar && \
 cd .. && \
 oc start-build debezium-connect --from-dir=. --follow && \
 cd ..
@@ -82,8 +82,12 @@ echo "Setting up Aggregator"
 oc new-app --name=aggregator debezium/msa-lab-s2i:latest~https://github.com/debezium/debezium-examples.git \
     --context-dir=kstreams-live-update/aggregator \
     -e AB_PROMETHEUS_OFF=true \
-    -e KAFKA_BOOTSTRAP_SERVERS=my-cluster-kafka-bootstrap:9092 \
-    -e JAVA_OPTIONS=-Djava.net.preferIPv4Stack=true
+    -e QUARKUS_KAFKA_STREAMS_BOOTSTRAP_SERVERS=my-cluster-kafka-bootstrap:9092 \
+    -e JAVA_OPTIONS=-Djava.net.preferIPv4Stack=true \
+    -e JAVA_APP_JAR=aggregator-runner.jar \
+    -e JAVA_LIB_DIR=lib
+
+oc set env buildconfig/aggregator ARTIFACT_COPY_ARGS='-p -r lib/ *-runner.jar'
 
 oc patch dc/aggregator -p '[{"op": "add", "path": "/spec/template/spec/containers/0/ports/1", "value":{"containerPort":8080,"protocol":"TCP"}}]' --type=json
 
