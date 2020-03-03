@@ -11,18 +11,16 @@
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <database.hostname>localhost</database.hostname>
-        <database.port>3306</database.port>
-        <database.user>debezium</database.user>
-        <database.password>dbz</database.password>
-        <database.whitelist>inventory</database.whitelist>
-        <table.whitelist>inventory.customers</table.whitelist>
+        <database.port>1433</database.port>
+        <database.user>sa</database.user>
+        <database.password>Iamsoverylong8</database.password>
+        <database.whitelist>trademe</database.whitelist>
+        <table.whitelist>dbo.auction</table.whitelist>
 
-        <kinesis.region>eu-central-1</kinesis.region>
+        <kinesis.region>ap-southeast-2</kinesis.region>
 
-        <mysql.init.timeout>30000</mysql.init.timeout>
-
-        <version.debezium>0.8.1.Final</version.debezium>
-        <version.debezium.tag>0.8</version.debezium.tag>
+        <version.debezium>0.9.5.Final</version.debezium>
+        <version.debezium.tag>0.9</version.debezium.tag>
         <version.kinesis.client>1.9.0</version.kinesis.client>
         <version.jackson>2.9.1</version.jackson>
 
@@ -38,19 +36,13 @@
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-connector-mysql</artifactId>
+                <artifactId>debezium-connector-sqlserver</artifactId>
                 <version>${version.debezium}</version>
             </dependency>
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>amazon-kinesis-client</artifactId>
                 <version>${version.kinesis.client}</version>
-            </dependency>
-            <!-- Align Jackson dependencies between Debezium and Kinesis client -->
-            <dependency>
-                <groupId>com.fasterxml.jackson.dataformat</groupId>
-                <artifactId>jackson-dataformat-cbor</artifactId>
-                <version>${version.jackson}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -61,7 +53,7 @@
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-connector-mysql</artifactId>
+                <artifactId>debezium-connector-sqlserver</artifactId>
             </dependency>
             <dependency>
                 <groupId>com.amazonaws</groupId>

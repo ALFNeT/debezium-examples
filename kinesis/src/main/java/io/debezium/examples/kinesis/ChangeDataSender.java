@@ -1,11 +1,14 @@
 package io.debezium.examples.kinesis;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import com.amazonaws.services.kinesisfirehose.model.Record;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -16,18 +19,19 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.services.kinesis.AmazonKinesis;
-import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
-import com.amazonaws.services.kinesis.model.PutRecordRequest;
+import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehose;
+import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehoseClientBuilder;
+import com.amazonaws.services.kinesisfirehose.model.PutRecordRequest;
+
 
 import io.debezium.config.Configuration;
-import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.relational.history.MemoryDatabaseHistory;
 import io.debezium.util.Clock;
 
 /**
- * Demo for using the Debezium Embedded API to send change events to Amazon Kinesis.
+ * Demo for using the Debezium Embedded API to send change events to Amazon Kinesis Firehose.
  */
 public class ChangeDataSender implements Runnable {
 
@@ -38,18 +42,19 @@ public class ChangeDataSender implements Runnable {
 
     private final Configuration config;
     private final JsonConverter valueConverter;
-    private final AmazonKinesis kinesisClient;
+    private final AmazonKinesisFirehose kinesisFirehoseClient;
 
     public ChangeDataSender() {
         config = Configuration.empty().withSystemProperties(Function.identity()).edit()
-                .with(EmbeddedEngine.CONNECTOR_CLASS, "io.debezium.connector.mysql.MySqlConnector")
+                .with(EmbeddedEngine.CONNECTOR_CLASS, "io.debezium.connector.sqlserver.SqlServerConnector")
                 .with(EmbeddedEngine.ENGINE_NAME, APP_NAME)
-                .with(MySqlConnectorConfig.SERVER_NAME,APP_NAME)
-                .with(MySqlConnectorConfig.SERVER_ID, 8192)
+                .with(SqlServerConnectorConfig.SERVER_NAME, APP_NAME)
+                .with(SqlServerConnectorConfig.DATABASE_NAME, "trademe")
 
                 // for demo purposes let's store offsets and history only in memory
                 .with(EmbeddedEngine.OFFSET_STORAGE, "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
-                .with(MySqlConnectorConfig.DATABASE_HISTORY, MemoryDatabaseHistory.class.getName())
+                .with(SqlServerConnectorConfig.DATABASE_HISTORY, MemoryDatabaseHistory.class.getName())
+                .with("decimal.handling.mode", "string")
 
                 // Send JSON without schema
                 .with("schemas.enable", false)
@@ -60,9 +65,9 @@ public class ChangeDataSender implements Runnable {
 
         final String regionName = config.getString(KINESIS_REGION_CONF_NAME);
 
-        final AWSCredentialsProvider credentialsProvider = new ProfileCredentialsProvider("default");
+        final AWSCredentialsProvider credentialsProvider = new ProfileCredentialsProvider("TestDataEngineeringAdministrator-Administrator");
 
-        kinesisClient = AmazonKinesisClientBuilder.standard()
+        kinesisFirehoseClient = AmazonKinesisFirehoseClientBuilder.standard()
                 .withCredentials(credentialsProvider)
                 .withRegion(regionName)
                 .build();
@@ -130,16 +135,27 @@ public class ChangeDataSender implements Runnable {
         if ( null != record.value() )
             message.put("value", record.value());
 
-        String partitionKey = String.valueOf(record.key() != null ? record.key().hashCode() : -1);
-        final byte[] payload = valueConverter.fromConnectData("dummy", schema, message);
+        ByteArrayOutputStream payloadStream = new ByteArrayOutputStream();
+
+        byte[] lineFeed = {'\n'};
+
+        try {
+            payloadStream.write(valueConverter.fromConnectData("dummy", schema, message));
+            payloadStream.write(lineFeed);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        byte[] payload = payloadStream.toByteArray();
+
+        Record firehoseRecord = new Record().withData(ByteBuffer.wrap(payload));
 
         PutRecordRequest putRecord = new PutRecordRequest();
 
-        putRecord.setStreamName(streamNameMapper(record.topic()));
-        putRecord.setPartitionKey(partitionKey);
-        putRecord.setData(ByteBuffer.wrap(payload));
+        putRecord.setDeliveryStreamName("test-eventtracking");
+        putRecord.setRecord(firehoseRecord);
 
-        kinesisClient.putRecord(putRecord);
+        kinesisFirehoseClient.putRecord(putRecord);
     }
 
     private String streamNameMapper(String topic) {
